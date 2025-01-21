@@ -1,0 +1,70 @@
+name: 'Private Packagist Conductor'
+description: 'GitHub Action to integrate Private Packagist Conductor with your CI'
+
+author: Packagist Conductors GmbH <contact@packagist.com>
+
+inputs:
+    file_pattern:
+        description: The file pattern used for `git add`. For example `composer.*`
+        default: '.'
+        required: false
+
+runs:
+    using: "composite"
+    steps:
+        - name: "Validate GitHub action version"
+          shell: "bash"
+          run: "${GITHUB_ACTION_PATH}/bin/ci_version_check.sh ${{ github.event.client_payload.requirements.minimumCiActionVersion }} 0.1"
+
+        - name: "Validate PHP version"
+          shell: "bash"
+          run: "${GITHUB_ACTION_PATH}/bin/php_version_check.sh ${{ github.event.client_payload.requirements.minimumPhpVersion }}"
+
+        - name: "Validate Composer version"
+          shell: "bash"
+          run: "${GITHUB_ACTION_PATH}/bin/composer_version_check.sh ${{ github.event.client_payload.requirements.minimumComposerVersion }}"
+
+        - name: Install dependencies
+          uses: "ramsey/composer-install@v3"
+          with:
+              working-directory: "${{ github.event.client_payload.workingDirectory }}"
+
+        - name: Composer update
+          run: "${{ github.event.client_payload.updateCommand.plain }}"
+          shell: bash
+          working-directory: "${{ github.event.client_payload.workingDirectory }}"
+
+        - name: Create branch
+          run: git checkout -b $BRANCH
+          shell: bash
+          env:
+              BRANCH: ${{ github.event.client_payload.branch }}
+
+        - name: Add files
+          run: |
+              read -r -a PATTERN_EXPANDED <<< "$FILE_PATTERN";
+              git add ${FILE_PATTERN:+"${PATTERN_EXPANDED[@]}"};
+          shell: bash
+          env:
+              FILE_PATTERN: ${{ inputs.file_pattern }}
+
+        - name: Commit
+          uses: qoomon/actions--create-commit@dfef4d264de752be6d6195a4d61a2f3d3262d406 # v1.2.3
+          with:
+              message: ${{ github.event.client_payload.commitMessage }}
+              skip-empty: true
+
+        - name: Push branch
+          run: git push origin $BRANCH --force
+          shell: bash
+          env:
+              BRANCH: ${{ github.event.client_payload.branch }}
+
+        - name: Call webhook from Private Packagist to create the PR
+          shell: bash
+          run: "curl -fsSL -X POST -u ${{ github.event.client_payload.webhook.authentication.username }}:${{ github.event.client_payload.webhook.authentication.password }} --header \"Content-Type: application/json\" --data '{\"runId\":\"${{github.run_id}}\",\"ciScriptVersion\":\"0.1\"}' ${{ github.event.client_payload.webhook.executedUrl }}"
+
+        - name: Call webhook from Private Packagist to notify about build failure
+          shell: bash
+          if: ${{ failure() }}
+          run: "curl -fsSL -X POST -u ${{ github.event.client_payload.webhook.authentication.username }}:${{ github.event.client_payload.webhook.authentication.password }} --header \"Content-Type: application/json\" --data '{\"runId\":\"${{github.run_id}}\",\"ciScriptVersion\":\"0.1\"}' ${{ github.event.client_payload.webhook.errorUrl }}"
