@@ -54,6 +54,11 @@ runs:
               message: ${{ github.event.client_payload.commitMessage }}
               skip-empty: true
 
+        - name: Store changed files
+          id: changed_files
+          run: echo "COUNT=$(git --no-pager diff --name-only HEAD~ | wc -l | tr -d ' ')" >> $GITHUB_OUTPUT
+          shell: bash
+
         - name: Push branch
           run: git push origin $BRANCH --force
           shell: bash
@@ -62,9 +67,9 @@ runs:
 
         - name: Call webhook from Private Packagist to create the PR
           shell: bash
-          run: "curl -fsSL -X POST -u ${{ github.event.client_payload.webhook.authentication.username }}:${{ github.event.client_payload.webhook.authentication.password }} --header \"Content-Type: application/json\" --data '{\"runId\":\"${{github.run_id}}\",\"ciScriptVersion\":\"0.1\"}' ${{ github.event.client_payload.webhook.executedUrl }}"
+          run: "curl -fsSL -X POST -u ${{ github.event.client_payload.webhook.authentication.username }}:${{ github.event.client_payload.webhook.authentication.password }} --header \"Content-Type: application/json\" --data '{\"runId\":\"${{github.run_id}}\",\"changedFiles\":\"${{ steps.changed_files.outputs.COUNT }}\",\"versions\":{\"ciScriptVersion\":\"0.1\"}}' ${{ github.event.client_payload.webhook.executedUrl }}"
 
         - name: Call webhook from Private Packagist to notify about build failure
           shell: bash
           if: ${{ failure() }}
-          run: "curl -fsSL -X POST -u ${{ github.event.client_payload.webhook.authentication.username }}:${{ github.event.client_payload.webhook.authentication.password }} --header \"Content-Type: application/json\" --data '{\"runId\":\"${{github.run_id}}\",\"ciScriptVersion\":\"0.1\"}' ${{ github.event.client_payload.webhook.errorUrl }}"
+          run: "curl -fsSL -X POST -u ${{ github.event.client_payload.webhook.authentication.username }}:${{ github.event.client_payload.webhook.authentication.password }} --header \"Content-Type: application/json\" --data '{\"runId\":\"${{github.run_id}}\",\"versions\":{\"ciScriptVersion\":\"0.1\"}}' ${{ github.event.client_payload.webhook.errorUrl }}"
