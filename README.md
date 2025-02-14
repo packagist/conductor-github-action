@@ -38,8 +38,6 @@ jobs:
     conductor:
         name: Private Packagist Conductor
         runs-on: "ubuntu-latest"
-        env:
-            COMPOSER_AUTH: ${{ secrets.COMPOSER_AUTH }}
 
         steps:
             - uses: actions/checkout@v4
