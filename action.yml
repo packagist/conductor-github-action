@@ -12,6 +12,12 @@ inputs:
 runs:
     using: "composite"
     steps:
+        - run: |
+            CONDUCTOR_TOKEN=$(jq -r '.client_payload.composerAuthentication.token' $GITHUB_EVENT_PATH)
+            echo "::add-mask::$CONDUCTOR_TOKEN"
+          if: ${{ github.event.client_payload.composerAuthentication.type != 'none' }}
+          shell: "bash"
+
         - name: "Validate GitHub action version"
           shell: "bash"
           run: "${GITHUB_ACTION_PATH}/bin/ci_version_check.sh ${{ github.event.client_payload.requirements.minimumCiActionVersion }} 1.0.0"
@@ -23,6 +29,11 @@ runs:
         - name: "Validate Composer version"
           shell: "bash"
           run: "${GITHUB_ACTION_PATH}/bin/composer_version_check.sh ${{ github.event.client_payload.requirements.minimumComposerVersion }}"
+
+        - name: Configure Composer Authentication
+          shell: "bash"
+          if: ${{ github.event.client_payload.composerAuthentication.type == 'environment' }}
+          run: echo 'COMPOSER_AUTH=${{ github.event.client_payload.composerAuthentication.environment }}' >> "$GITHUB_ENV"
 
         - name: Install dependencies
           uses: ramsey/composer-install@57532f8be5bda426838819c5ee9afb8af389d51a # 3.0.0
