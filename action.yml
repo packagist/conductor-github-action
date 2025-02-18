@@ -12,11 +12,11 @@ inputs:
 runs:
     using: "composite"
     steps:
-        - run: echo "::add-mask::$CONDUCTOR_TOKEN"
+        - run: |
+            CONDUCTOR_TOKEN=$(jq -r '.client_payload.composerAuthentication.token' $GITHUB_EVENT_PATH)
+            echo "::add-mask::$CONDUCTOR_TOKEN"
           if: ${{ github.event.client_payload.composerAuthentication.type != 'none' }}
           shell: "bash"
-          env:
-            CONDUCTOR_TOKEN: ${{ github.event.client_payload.composerAuthentication.token }}
 
         - name: "Validate GitHub action version"
           shell: "bash"
