@@ -67,12 +67,13 @@ runs:
 
         - name: Store number of changed files
           id: number_of_changed_files
-          run: echo "COUNT=$(git --no-pager diff --name-only HEAD~ | wc -l | tr -d ' ')" >> $GITHUB_OUTPUT
+          run: echo "COUNT=$(git --no-pager diff --name-only $GITHUB_SHA | wc -l | tr -d ' ')" >> $GITHUB_OUTPUT
           shell: bash
 
         - name: Push branch
           run: git push origin $BRANCH --force
           shell: bash
+          if: ${{ steps.number_of_changed_files.outputs.COUNT != 0 }}
           env:
               BRANCH: ${{ github.event.client_payload.branch }}
 
