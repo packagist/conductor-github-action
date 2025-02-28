@@ -73,6 +73,7 @@ runs:
         - name: Push branch
           run: git push origin $BRANCH --force
           shell: bash
+          if: ${{ steps.number_of_changed_files.outputs.COUNT != 0 }}
           env:
               BRANCH: ${{ github.event.client_payload.branch }}
 
