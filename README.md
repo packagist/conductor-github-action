@@ -68,6 +68,19 @@ For example:
       file_pattern: "composer.*"
 ```
 
+#### skip_git_hooks
+
+The `skip_git_hooks` input parameter allows you to disable any git hooks that get installed as part of the GitHub Action
+e.g. during composer install or update.
+
+For example:
+
+```yaml
+- uses: packagist/conductor-github-action
+  with:
+    skip_git_hooks: "true"
+```
+
 ## Copyright and License
 
 The  GitHub Action is licensed under the MIT License.

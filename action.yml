@@ -8,6 +8,10 @@ inputs:
         description: The file pattern used for `git add`. For example `composer.*`
         default: '.'
         required: false
+    skip_git_hooks:
+        description: Skip any git hooks that get installed as part of the GitHub Action e.g. during composer install or update.
+        default: 'false'
+        required: false
 
 runs:
     using: "composite"
@@ -44,6 +48,11 @@ runs:
           run: "${{ github.event.client_payload.updateCommand.plain }}"
           shell: bash
           working-directory: "${{ github.event.client_payload.workingDirectory }}"
+
+        - name: Uninstall git hooks
+          if: ${{ inputs.skip_git_hooks != 'false' }}
+          run: "rm -rf .git/hooks"
+          shell: "bash"
 
         - name: Create branch
           run: git checkout -b $BRANCH
