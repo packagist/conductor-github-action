@@ -34,7 +34,7 @@ runs:
           shell: "bash"
           run: "${GITHUB_ACTION_PATH}/bin/composer_version_check.sh ${{ github.event.client_payload.requirements.minimumComposerVersion }}"
 
-        - name: Configure Composer Authentication
+        - name: Configure Composer authentication
           shell: "bash"
           if: ${{ github.event.client_payload.composerAuthentication.type == 'environment' }}
           run: echo 'COMPOSER_AUTH=${{ github.event.client_payload.composerAuthentication.environment }}' >> "$GITHUB_ENV"
@@ -43,6 +43,12 @@ runs:
           uses: ramsey/composer-install@a2636af0004d1c0499ffca16ac0b4cc94df70565 # 3.1.0
           with:
               working-directory: "${{ github.event.client_payload.workingDirectory }}"
+
+        - name: Modify requirements in the composer.json
+          run: "${{ github.event.client_payload.requireCommand.plain }}"
+          if: ${{ github.event.client_payload.requireCommand }}
+          shell: bash
+          working-directory: "${{ github.event.client_payload.workingDirectory }}"
 
         - name: Composer update
           run: "${{ github.event.client_payload.updateCommand.plain }}"
@@ -86,7 +92,7 @@ runs:
           env:
               BRANCH: ${{ github.event.client_payload.branch }}
 
-        - name: Call webhook from Private Packagist to create the PR
+        - name: Call webhook from Private Packagist to create the pull request
           shell: bash
           run: "curl -fsSL -X POST -u ${{ github.event.client_payload.webhook.authentication.username }}:${{ github.event.client_payload.webhook.authentication.password }} --header \"Content-Type: application/json\" --data '{\"runId\":\"${{github.run_id}}\",\"numberOfChangedFiles\":\"${{ steps.number_of_changed_files.outputs.COUNT }}\",\"versions\":{\"ciScriptVersion\":\"1.2.0\"}}' ${{ github.event.client_payload.webhook.executedUrl }}"
 
