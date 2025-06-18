@@ -43,16 +43,16 @@ runs:
           uses: ramsey/composer-install@3cf229dc2919194e9e36783941438d17239e8520 # 3.1.1
           with:
               working-directory: "${{ github.event.client_payload.workingDirectory }}"
-              composer-options: "${{ github.event.client_payload.debug == true && '-vvv' || '' }}"
+              composer-options: "${{ github.event.client_payload.settings.debug == true && '-vvv' || '' }}"
 
         - name: Modify requirements in the composer.json
-          run: "${{ github.event.client_payload.debug == true && github.event.client_payload.requireCommand.debug || github.event.client_payload.requireCommand.plain }}"
+          run: "${{ github.event.client_payload.settings.debug == true && github.event.client_payload.requireCommand.debug || github.event.client_payload.requireCommand.plain }}"
           if: ${{ github.event.client_payload.requireCommand }}
           shell: bash
           working-directory: "${{ github.event.client_payload.workingDirectory }}"
 
         - name: Composer update
-          run: "${{ github.event.client_payload.debug == true && github.event.client_payload.updateCommand.debug || github.event.client_payload.updateCommand.plain }}"
+          run: "${{ github.event.client_payload.settings.debug == true && github.event.client_payload.updateCommand.debug || github.event.client_payload.updateCommand.plain }}"
           shell: bash
           working-directory: "${{ github.event.client_payload.workingDirectory }}"
 
