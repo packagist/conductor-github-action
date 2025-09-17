@@ -34,6 +34,14 @@ runs:
           shell: "bash"
           run: "${GITHUB_ACTION_PATH}/bin/composer_version_check.sh ${{ github.event.client_payload.requirements.minimumComposerVersion }}"
 
+        - name: Store commit info
+          id: commit_info
+          run: |
+            git log -1 --format="HASH=%H" >> $GITHUB_OUTPUT
+            git log -1 --format="AUTHOR=%an" >> $GITHUB_OUTPUT
+            git log -1 --format="MESSAGE=%s" >> $GITHUB_OUTPUT
+          shell: bash
+
         - name: Configure Composer authentication
           shell: "bash"
           if: ${{ github.event.client_payload.composerAuthentication.type == 'environment' }}
@@ -95,9 +103,53 @@ runs:
 
         - name: Call webhook from Private Packagist to create the pull request
           shell: bash
-          run: "curl -fsSL -X POST -u ${{ github.event.client_payload.webhook.authentication.username }}:${{ github.event.client_payload.webhook.authentication.password }} --header \"Content-Type: application/json\" --data '{\"runId\":\"${{github.run_id}}\",\"numberOfChangedFiles\":\"${{ steps.number_of_changed_files.outputs.COUNT }}\",\"versions\":{\"ciScriptVersion\":\"1.4.0\"}}' ${{ github.event.client_payload.webhook.executedUrl }}"
+          env:
+            RUN_ID: ${{ github.run_id }};
+            CHANGED_FILES: ${{ steps.number_of_changed_files.outputs.COUNT }}
+            COMMIT_HASH: ${{ steps.commit_info.outputs.HASH }},
+            COMMIT_AUTHOR: ${{ steps.commit_info.outputs.AUTHOR }},
+            COMMIT_MESSAGE: ${{ steps.commit_info.outputs.MESSAGE }}
+            CI_VERSION: "1.5.0"
+          run: |
+            jq -n '{
+              "runId": env.RUN_ID,
+              "numberOfChangedFiles": env.CHANGED_FILES,
+              "commitInfo": {
+                "hash": env.COMMIT_HASH,
+                "author": env.COMMIT_AUTHOR,
+                "message": env.COMMIT_MESSAGE
+              },
+              "versions": {
+                "ciScriptVersion": env.CI_VERSION
+              }
+            }' | curl -fsSL -X POST \
+              -u "${{ github.event.client_payload.webhook.authentication.username }}:${{ github.event.client_payload.webhook.authentication.password }}" \
+              --header "Content-Type: application/json" \
+              --data @- \
+              "${{ github.event.client_payload.webhook.executedUrl }}"
 
         - name: Call webhook from Private Packagist to notify about build failure
           shell: bash
+          env:
+            RUN_ID: ${{ github.run_id }}
+            COMMIT_HASH: ${{ steps.commit_info.outputs.HASH }}
+            COMMIT_AUTHOR: ${{ steps.commit_info.outputs.AUTHOR }}
+            COMMIT_MESSAGE: ${{ steps.commit_info.outputs.MESSAGE }}
+            CI_VERSION: 1.5.0
           if: ${{ failure() }}
-          run: "curl -fsSL -X POST -u ${{ github.event.client_payload.webhook.authentication.username }}:${{ github.event.client_payload.webhook.authentication.password }} --header \"Content-Type: application/json\" --data '{\"runId\":\"${{github.run_id}}\",\"versions\":{\"ciScriptVersion\":\"1.4.0\"}}' ${{ github.event.client_payload.webhook.errorUrl }}"
+          run: |
+            jq -n '{
+              "runId": env.RUN_ID,
+              "commitInfo": {
+                "hash": env.COMMIT_HASH,
+                "author": env.COMMIT_AUTHOR,
+                "message": env.COMMIT_MESSAGE
+              },
+              "versions": {
+                "ciScriptVersion": env.CI_VERSION
+              }
+            }' | curl -fsSL -X POST \
+              -u "${{ github.event.client_payload.webhook.authentication.username }}:${{ github.event.client_payload.webhook.authentication.password }}" \
+              --header "Content-Type: application/json" \
+              --data @- \
+              "${{ github.event.client_payload.webhook.errorUrl }}"
