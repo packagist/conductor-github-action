@@ -16,6 +16,9 @@ inputs:
 runs:
     using: "composite"
     steps:
+        - name: Set Conductor version
+          shell: "bash"
+          run: echo "CONDUCTOR_ACTION_VERSION=1.5.0" >> $GITHUB_ENV
         - run: |
             CONDUCTOR_TOKEN=$(jq -r '.client_payload.composerAuthentication.token' $GITHUB_EVENT_PATH)
             echo "::add-mask::$CONDUCTOR_TOKEN"
@@ -24,7 +27,7 @@ runs:
 
         - name: "Validate GitHub action version"
           shell: "bash"
-          run: "${GITHUB_ACTION_PATH}/bin/ci_version_check.sh ${{ github.event.client_payload.requirements.minimumCiActionVersion }} 1.4.0"
+          run: "${GITHUB_ACTION_PATH}/bin/ci_version_check.sh ${{ github.event.client_payload.requirements.minimumCiActionVersion }} $CONDUCTOR_ACTION_VERSION"
 
         - name: "Validate PHP version"
           shell: "bash"
@@ -109,7 +112,6 @@ runs:
             COMMIT_HASH: ${{ steps.commit_info.outputs.HASH }},
             COMMIT_AUTHOR: ${{ steps.commit_info.outputs.AUTHOR }},
             COMMIT_MESSAGE: ${{ steps.commit_info.outputs.MESSAGE }}
-            CI_VERSION: "1.5.0"
           run: |
             jq -n '{
               "runId": env.RUN_ID,
@@ -120,7 +122,7 @@ runs:
                 "message": env.COMMIT_MESSAGE
               },
               "versions": {
-                "ciScriptVersion": env.CI_VERSION
+                "ciScriptVersion": env.CONDUCTOR_ACTION_VERSION
               }
             }' | curl -fsSL -X POST \
               -u "${{ github.event.client_payload.webhook.authentication.username }}:${{ github.event.client_payload.webhook.authentication.password }}" \
@@ -135,7 +137,6 @@ runs:
             COMMIT_HASH: ${{ steps.commit_info.outputs.HASH }}
             COMMIT_AUTHOR: ${{ steps.commit_info.outputs.AUTHOR }}
             COMMIT_MESSAGE: ${{ steps.commit_info.outputs.MESSAGE }}
-            CI_VERSION: 1.5.0
           if: ${{ failure() }}
           run: |
             jq -n '{
@@ -146,7 +147,7 @@ runs:
                 "message": env.COMMIT_MESSAGE
               },
               "versions": {
-                "ciScriptVersion": env.CI_VERSION
+                "ciScriptVersion": env.CONDUCTOR_ACTION_VERSION
               }
             }' | curl -fsSL -X POST \
               -u "${{ github.event.client_payload.webhook.authentication.username }}:${{ github.event.client_payload.webhook.authentication.password }}" \
