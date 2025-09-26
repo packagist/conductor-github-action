@@ -18,7 +18,7 @@ runs:
     steps:
         - name: Set Conductor version
           shell: "bash"
-          run: echo "CONDUCTOR_ACTION_VERSION=1.5.0" >> $GITHUB_ENV
+          run: echo "CONDUCTOR_ACTION_VERSION=1.5.1" >> $GITHUB_ENV
         - run: |
             CONDUCTOR_TOKEN=$(jq -r '.client_payload.composerAuthentication.token' $GITHUB_EVENT_PATH)
             echo "::add-mask::$CONDUCTOR_TOKEN"
