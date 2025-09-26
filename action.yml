@@ -109,8 +109,8 @@ runs:
           env:
             RUN_ID: ${{ github.run_id }};
             CHANGED_FILES: ${{ steps.number_of_changed_files.outputs.COUNT }}
-            COMMIT_HASH: ${{ steps.commit_info.outputs.HASH }},
-            COMMIT_AUTHOR: ${{ steps.commit_info.outputs.AUTHOR }},
+            COMMIT_HASH: ${{ steps.commit_info.outputs.HASH }}
+            COMMIT_AUTHOR: ${{ steps.commit_info.outputs.AUTHOR }}
             COMMIT_MESSAGE: ${{ steps.commit_info.outputs.MESSAGE }}
           run: |
             jq -n '{
