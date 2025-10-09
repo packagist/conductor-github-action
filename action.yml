@@ -37,8 +37,8 @@ runs:
           shell: "bash"
           run: "${GITHUB_ACTION_PATH}/bin/composer_version_check.sh ${{ github.event.client_payload.requirements.minimumComposerVersion }}"
 
-        - name: Store commit info
-          id: commit_info
+        - name: Store base commit info
+          id: base_commit_info
           run: |
             git log -1 --format="HASH=%H" >> $GITHUB_OUTPUT
             git log -1 --format="AUTHOR=%an" >> $GITHUB_OUTPUT
@@ -97,6 +97,14 @@ runs:
           run: echo "COUNT=$(git --no-pager diff --name-only $GITHUB_SHA | wc -l | tr -d ' ')" >> $GITHUB_OUTPUT
           shell: bash
 
+        - name: Store Conductor commit info
+          id: conductor_commit_info
+          run: |
+            git log -1 --format="HASH=%H" >> $GITHUB_OUTPUT
+            git log -1 --format="AUTHOR=%an" >> $GITHUB_OUTPUT
+            git log -1 --format="MESSAGE=%s" >> $GITHUB_OUTPUT
+          shell: bash
+
         - name: Push branch
           run: git push origin $BRANCH --force
           shell: bash
@@ -109,17 +117,27 @@ runs:
           env:
             RUN_ID: ${{ github.run_id }};
             CHANGED_FILES: ${{ steps.number_of_changed_files.outputs.COUNT }}
-            COMMIT_HASH: ${{ steps.commit_info.outputs.HASH }}
-            COMMIT_AUTHOR: ${{ steps.commit_info.outputs.AUTHOR }}
-            COMMIT_MESSAGE: ${{ steps.commit_info.outputs.MESSAGE }}
+            BASE_COMMIT_HASH: ${{ steps.base_commit_info.outputs.HASH }}
+            BASE_COMMIT_AUTHOR: ${{ steps.base_commit_info.outputs.AUTHOR }}
+            BASE_COMMIT_MESSAGE: ${{ steps.base_commit_info.outputs.MESSAGE }}
+            CONDUCTOR_COMMIT_HASH: ${{ steps.conductor_commit_info.outputs.HASH }}
+            CONDUCTOR_COMMIT_AUTHOR: ${{ steps.conductor_commit_info.outputs.AUTHOR }}
+            CONDUCTOR_COMMIT_MESSAGE: ${{ steps.conductor_commit_info.outputs.MESSAGE }}
           run: |
             jq -n '{
               "runId": env.RUN_ID,
               "numberOfChangedFiles": env.CHANGED_FILES,
-              "commitInfo": {
-                "hash": env.COMMIT_HASH,
-                "author": env.COMMIT_AUTHOR,
-                "message": env.COMMIT_MESSAGE
+              "gitInfo": {
+                "baseCommit": {
+                    "hash": env.BASE_COMMIT_HASH,
+                    "author": env.BASE_COMMIT_AUTHOR,
+                    "message": env.BASE_COMMIT_MESSAGE
+                },
+                "conductorCommit": {
+                    "hash": env.CONDUCTOR_COMMIT_HASH,
+                    "author": env.CONDUCTOR_COMMIT_AUTHOR,
+                    "message": env.CONDUCTOR_COMMIT_MESSAGE
+                }
               },
               "versions": {
                 "ciScriptVersion": env.CONDUCTOR_ACTION_VERSION
@@ -134,17 +152,19 @@ runs:
           shell: bash
           env:
             RUN_ID: ${{ github.run_id }}
-            COMMIT_HASH: ${{ steps.commit_info.outputs.HASH }}
-            COMMIT_AUTHOR: ${{ steps.commit_info.outputs.AUTHOR }}
-            COMMIT_MESSAGE: ${{ steps.commit_info.outputs.MESSAGE }}
+            BASE_COMMIT_HASH: ${{ steps.base_commit_info.outputs.HASH }}
+            BASE_COMMIT_AUTHOR: ${{ steps.base_commit_info.outputs.AUTHOR }}
+            BASE_COMMIT_MESSAGE: ${{ steps.base_commit_info.outputs.MESSAGE }}
           if: ${{ failure() }}
           run: |
             jq -n '{
               "runId": env.RUN_ID,
-              "commitInfo": {
-                "hash": env.COMMIT_HASH,
-                "author": env.COMMIT_AUTHOR,
-                "message": env.COMMIT_MESSAGE
+              "gitInfo": {
+                "baseCommit": {
+                    "hash": env.BASE_COMMIT_HASH,
+                    "author": env.BASE_COMMIT_AUTHOR,
+                    "message": env.BASE_COMMIT_MESSAGE
+                }
               },
               "versions": {
                 "ciScriptVersion": env.CONDUCTOR_ACTION_VERSION
