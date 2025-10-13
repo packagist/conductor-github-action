@@ -18,7 +18,7 @@ runs:
     steps:
         - name: Set Conductor version
           shell: "bash"
-          run: echo "CONDUCTOR_ACTION_VERSION=1.5.2" >> $GITHUB_ENV
+          run: echo "CONDUCTOR_ACTION_VERSION=1.6.0" >> $GITHUB_ENV
         - run: |
             CONDUCTOR_TOKEN=$(jq -r '.client_payload.composerAuthentication.token' $GITHUB_EVENT_PATH)
             echo "::add-mask::$CONDUCTOR_TOKEN"
@@ -140,7 +140,7 @@ runs:
                 }
               },
               "versions": {
-                "ciScriptVersion": env.CONDUCTOR_ACTION_VERSION
+                "conductorVersion": env.CONDUCTOR_ACTION_VERSION
               }
             }' | curl -fsSL -X POST \
               -u "${{ github.event.client_payload.webhook.authentication.username }}:${{ github.event.client_payload.webhook.authentication.password }}" \
@@ -167,7 +167,7 @@ runs:
                 }
               },
               "versions": {
-                "ciScriptVersion": env.CONDUCTOR_ACTION_VERSION
+                "conductorVersion": env.CONDUCTOR_ACTION_VERSION
               }
             }' | curl -fsSL -X POST \
               -u "${{ github.event.client_payload.webhook.authentication.username }}:${{ github.event.client_payload.webhook.authentication.password }}" \
