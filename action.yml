@@ -16,6 +16,13 @@ inputs:
 runs:
     using: "composite"
     steps:
+        # Temporary workaround to make sure you can set up Conductor for
+        # the first time. The CI verification job runs "composer update nothing"
+        # which fails if your composer.lock contains any versions with
+        # known security issues in Composer >=2.9.0
+        - name: Set security blocking environment variable
+          shell: "bash"
+          run: echo "COMPOSER_NO_SECURITY_BLOCKING=${{ github.event.client_payload.branch == 'conductor-nothing' && 1 || 0 }}" >> $GITHUB_ENV
         - name: Set Conductor version
           shell: "bash"
           run: echo "CONDUCTOR_ACTION_VERSION=1.5.2" >> $GITHUB_ENV
