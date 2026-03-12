@@ -58,7 +58,7 @@ runs:
           run: echo 'COMPOSER_AUTH=${{ github.event.client_payload.composerAuthentication.environment }}' >> "$GITHUB_ENV"
 
         - name: Install dependencies
-          uses: ramsey/composer-install@3cf229dc2919194e9e36783941438d17239e8520 # 3.1.1
+          uses: ramsey/composer-install@a35c6ebd3d08125aaf8852dff361e686a1a67947 # 3.2.0
           with:
               working-directory: "${{ github.event.client_payload.workingDirectory }}"
               composer-options: "${{ github.event.client_payload.settings.debug == true && '-vvv' || '' }}"
