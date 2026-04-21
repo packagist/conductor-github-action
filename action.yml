@@ -26,23 +26,35 @@ runs:
         - name: Set Conductor version
           shell: "bash"
           run: echo "CONDUCTOR_ACTION_VERSION=1.5.3" >> $GITHUB_ENV
+
         - run: |
             CONDUCTOR_TOKEN=$(jq -r '.client_payload.composerAuthentication.token' $GITHUB_EVENT_PATH)
             echo "::add-mask::$CONDUCTOR_TOKEN"
           if: ${{ github.event.client_payload.composerAuthentication.type != 'none' }}
           shell: "bash"
 
+        - run: |
+            WEBHOOK_AUTHENTICATION_PASSWORD=$(jq -r '.client_payload.webhook.authentication.password' $GITHUB_EVENT_PATH)
+            echo "::add-mask::$WEBHOOK_AUTHENTICATION_PASSWORD"
+          shell: "bash"
+
         - name: "Validate GitHub action version"
           shell: "bash"
-          run: "${GITHUB_ACTION_PATH}/bin/ci_version_check.sh ${{ github.event.client_payload.requirements.minimumCiActionVersion }} $CONDUCTOR_ACTION_VERSION"
+          run: "${GITHUB_ACTION_PATH}/bin/ci_version_check.sh ${GITHUB_EVENT_CLIENT_PAYLOAD_REQUIREMENTS_MINIMUMCIACTIONVERSION} $CONDUCTOR_ACTION_VERSION"
+          env:
+            GITHUB_EVENT_CLIENT_PAYLOAD_REQUIREMENTS_MINIMUMCIACTIONVERSION: ${{ github.event.client_payload.requirements.minimumCiActionVersion }}
 
         - name: "Validate PHP version"
           shell: "bash"
-          run: "${GITHUB_ACTION_PATH}/bin/php_version_check.sh ${{ github.event.client_payload.requirements.minimumPhpVersion }}"
+          run: "${GITHUB_ACTION_PATH}/bin/php_version_check.sh ${GITHUB_EVENT_CLIENT_PAYLOAD_REQUIREMENTS_MINIMUMPHPVERSION}"
+          env:
+            GITHUB_EVENT_CLIENT_PAYLOAD_REQUIREMENTS_MINIMUMPHPVERSION: ${{ github.event.client_payload.requirements.minimumPhpVersion }}
 
         - name: "Validate Composer version"
           shell: "bash"
-          run: "${GITHUB_ACTION_PATH}/bin/composer_version_check.sh ${{ github.event.client_payload.requirements.minimumComposerVersion }}"
+          run: "${GITHUB_ACTION_PATH}/bin/composer_version_check.sh ${GITHUB_EVENT_CLIENT_PAYLOAD_REQUIREMENTS_MINIMUMCOMPOSERVERSION}"
+          env:
+            GITHUB_EVENT_CLIENT_PAYLOAD_REQUIREMENTS_MINIMUMCOMPOSERVERSION: ${{ github.event.client_payload.requirements.minimumComposerVersion }}
 
         - name: Store base commit info
           id: base_commit_info
@@ -55,7 +67,9 @@ runs:
         - name: Configure Composer authentication
           shell: "bash"
           if: ${{ github.event.client_payload.composerAuthentication.type == 'environment' }}
-          run: echo 'COMPOSER_AUTH=${{ github.event.client_payload.composerAuthentication.environment }}' >> "$GITHUB_ENV"
+          run: echo 'COMPOSER_AUTH=${GITHUB_EVENT_CLIENT_PAYLOAD_COMPOSERAUTHENTICATION_ENVIRONMENT}' >> "$GITHUB_ENV"
+          env:
+            GITHUB_EVENT_CLIENT_PAYLOAD_COMPOSERAUTHENTICATION_ENVIRONMENT: ${{ github.event.client_payload.composerAuthentication.environment }}
 
         - name: Install dependencies
           uses: ramsey/composer-install@a35c6ebd3d08125aaf8852dff361e686a1a67947 # 3.2.0
@@ -130,6 +144,9 @@ runs:
             CONDUCTOR_COMMIT_HASH: ${{ steps.conductor_commit_info.outputs.HASH }}
             CONDUCTOR_COMMIT_AUTHOR: ${{ steps.conductor_commit_info.outputs.AUTHOR }}
             CONDUCTOR_COMMIT_MESSAGE: ${{ steps.conductor_commit_info.outputs.MESSAGE }}
+            GITHUB_EVENT_CLIENT_PAYLOAD_WEBHOOK_AUTHENTICATION_USERNAME: ${{ github.event.client_payload.webhook.authentication.username }}
+            GITHUB_EVENT_CLIENT_PAYLOAD_WEBHOOK_AUTHENTICATION_PASSWORD: ${{ github.event.client_payload.webhook.authentication.password }}
+            GITHUB_EVENT_CLIENT_PAYLOAD_WEBHOOK_EXECUTEDURL: ${{ github.event.client_payload.webhook.executedUrl }}
           run: |
             jq -n '{
               "runId": env.RUN_ID,
@@ -150,10 +167,10 @@ runs:
                 "ciScriptVersion": env.CONDUCTOR_ACTION_VERSION
               }
             }' | curl -fsSL -X POST \
-              -u "${{ github.event.client_payload.webhook.authentication.username }}:${{ github.event.client_payload.webhook.authentication.password }}" \
+              -u "${GITHUB_EVENT_CLIENT_PAYLOAD_WEBHOOK_AUTHENTICATION_USERNAME}:${GITHUB_EVENT_CLIENT_PAYLOAD_WEBHOOK_AUTHENTICATION_PASSWORD}" \
               --header "Content-Type: application/json" \
               --data @- \
-              "${{ github.event.client_payload.webhook.executedUrl }}"
+              "${GITHUB_EVENT_CLIENT_PAYLOAD_WEBHOOK_EXECUTEDURL}"
 
         - name: Call webhook from Private Packagist to notify about build failure
           shell: bash
@@ -162,6 +179,9 @@ runs:
             BASE_COMMIT_HASH: ${{ steps.base_commit_info.outputs.HASH }}
             BASE_COMMIT_AUTHOR: ${{ steps.base_commit_info.outputs.AUTHOR }}
             BASE_COMMIT_MESSAGE: ${{ steps.base_commit_info.outputs.MESSAGE }}
+            GITHUB_EVENT_CLIENT_PAYLOAD_WEBHOOK_AUTHENTICATION_USERNAME: ${{ github.event.client_payload.webhook.authentication.username }}
+            GITHUB_EVENT_CLIENT_PAYLOAD_WEBHOOK_AUTHENTICATION_PASSWORD: ${{ github.event.client_payload.webhook.authentication.password }}
+            GITHUB_EVENT_CLIENT_PAYLOAD_WEBHOOK_ERRORURL: ${{ github.event.client_payload.webhook.errorUrl }}
           if: ${{ failure() }}
           run: |
             jq -n '{
@@ -177,7 +197,7 @@ runs:
                 "ciScriptVersion": env.CONDUCTOR_ACTION_VERSION
               }
             }' | curl -fsSL -X POST \
-              -u "${{ github.event.client_payload.webhook.authentication.username }}:${{ github.event.client_payload.webhook.authentication.password }}" \
+              -u "${GITHUB_EVENT_CLIENT_PAYLOAD_WEBHOOK_AUTHENTICATION_USERNAME}:${GITHUB_EVENT_CLIENT_PAYLOAD_WEBHOOK_AUTHENTICATION_PASSWORD}" \
               --header "Content-Type: application/json" \
               --data @- \
-              "${{ github.event.client_payload.webhook.errorUrl }}"
+              "${GITHUB_EVENT_CLIENT_PAYLOAD_WEBHOOK_ERRORURL}"
