@@ -20,7 +20,7 @@ inputs:
 runs:
     using: "composite"
     steps:
-        # Set local environment variables using jq instead of passing the values via env: to not leak secrets before maksing them
+        # Set local environment variables using jq instead of passing the values via env: to not leak secrets before masking them
         - name: Mask Composer authentication token
           shell: bash
           run: |
