@@ -87,7 +87,7 @@ runs:
             git log -1 --format="MESSAGE=%s" >> $GITHUB_OUTPUT
 
         - name: Install dependencies
-          uses: ramsey/composer-install@a35c6ebd3d08125aaf8852dff361e686a1a67947 # 3.2.0
+          uses: ramsey/composer-install@a8d0d959dab41457692a5e2041bd9b757a119e3f # 3.2.1
           env:
             COMPOSER_AUTH: ${{ github.event.client_payload.composerAuthentication.type == 'environment' && github.event.client_payload.composerAuthentication.environment || env.COMPOSER_AUTH }}
           with:
