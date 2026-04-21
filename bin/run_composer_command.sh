@@ -36,6 +36,6 @@ done
 
 set -x
 # Argv-form execution: bash passes each array element as one argv entry with
-# no further parsing, so metacharacters inside a token reach composer as
+# no further parsing, so metacharacters inside a token reach Composer as
 # literal string data rather than as shell syntax.
 exec composer "${TOKENS[@]:1}"

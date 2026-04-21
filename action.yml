@@ -13,7 +13,7 @@ inputs:
         default: 'false'
         required: false
     packagist_url:
-        description: Base URL of the Private Packagist instance that dispatches this action. Webhook URLs in the payload must be under this prefix; requests to any other host are refused. Override this for self-hosted installations.
+        description: Base URL of the Private Packagist instance that dispatches this action. Webhook URLs in the payload must be under this prefix. Requests to any other host are refused. Override this for Self-Hosted installations.
         default: 'https://packagist.com'
         required: false
 
