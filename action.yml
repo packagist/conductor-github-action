@@ -12,84 +12,121 @@ inputs:
         description: Skip any git hooks that get installed as part of the GitHub Action e.g. during composer install or update.
         default: 'false'
         required: false
+    packagist_url:
+        description: Base URL of the Private Packagist instance that dispatches this action. Webhook URLs in the payload must be under this prefix. Requests to any other host are refused. Override this for Self-Hosted installations.
+        default: 'https://packagist.com'
+        required: false
 
 runs:
     using: "composite"
     steps:
+        # Set local environment variables using jq instead of passing the values via env: to not leak secrets before masking them
+        - name: Mask Composer authentication token
+          shell: bash
+          run: |
+            CONDUCTOR_TOKEN=$(jq -r '.client_payload.composerAuthentication.token' $GITHUB_EVENT_PATH)
+            echo "::add-mask::$CONDUCTOR_TOKEN"
+          if: ${{ github.event.client_payload.composerAuthentication.type != 'none' }}
+
+        - name: Mask webhook authentication token
+          shell: bash
+          run: |
+            WEBHOOK_AUTHENTICATION_PASSWORD=$(jq -r '.client_payload.webhook.authentication.password' $GITHUB_EVENT_PATH)
+            echo "::add-mask::$WEBHOOK_AUTHENTICATION_PASSWORD"
+
+        # This is the version that needs to be increased for each release of the GitHub Action
+        - name: Set Conductor version
+          shell: bash
+          run: echo "CONDUCTOR_ACTION_VERSION=1.5.3" >> $GITHUB_ENV
+
+        - name: Validate Conductor branch name
+          shell: bash
+          run: '"${GITHUB_ACTION_PATH}/bin/branch_name_check.sh" "${BRANCH}"'
+          env:
+            BRANCH: ${{ github.event.client_payload.branch }}
+
+        - name: "Validate GitHub action version"
+          shell: bash
+          run: "${GITHUB_ACTION_PATH}/bin/ci_version_check.sh ${MINIMUM_CI_ACTION_VERSION} $CONDUCTOR_ACTION_VERSION"
+          env:
+            MINIMUM_CI_ACTION_VERSION: ${{ github.event.client_payload.requirements.minimumCiActionVersion }}
+
+        - name: "Validate PHP version"
+          shell: bash
+          run: "${GITHUB_ACTION_PATH}/bin/php_version_check.sh ${MINIMUM_PHP_VERSION}"
+          env:
+            MINIMUM_PHP_VERSION: ${{ github.event.client_payload.requirements.minimumPhpVersion }}
+
+        - name: "Validate Composer version"
+          shell: bash
+          run: "${GITHUB_ACTION_PATH}/bin/composer_version_check.sh ${MINIMUM_COMPOSER_VERSION}"
+          env:
+            MINIMUM_COMPOSER_VERSION: ${{ github.event.client_payload.requirements.minimumComposerVersion }}
+
         # Temporary workaround to make sure you can set up Conductor for
         # the first time. The CI verification job runs "composer update nothing"
         # which fails if your composer.lock contains any versions with
         # known security issues in Composer >=2.9.0
         - name: Set security blocking environment variable
-          shell: "bash"
-          run: echo "COMPOSER_NO_SECURITY_BLOCKING=${{ github.event.client_payload.branch == 'conductor-nothing' && 1 || 0 }}" >> $GITHUB_ENV
-        - name: Set Conductor version
-          shell: "bash"
-          run: echo "CONDUCTOR_ACTION_VERSION=1.5.3" >> $GITHUB_ENV
-        - run: |
-            CONDUCTOR_TOKEN=$(jq -r '.client_payload.composerAuthentication.token' $GITHUB_EVENT_PATH)
-            echo "::add-mask::$CONDUCTOR_TOKEN"
-          if: ${{ github.event.client_payload.composerAuthentication.type != 'none' }}
-          shell: "bash"
-
-        - name: "Validate GitHub action version"
-          shell: "bash"
-          run: "${GITHUB_ACTION_PATH}/bin/ci_version_check.sh ${{ github.event.client_payload.requirements.minimumCiActionVersion }} $CONDUCTOR_ACTION_VERSION"
-
-        - name: "Validate PHP version"
-          shell: "bash"
-          run: "${GITHUB_ACTION_PATH}/bin/php_version_check.sh ${{ github.event.client_payload.requirements.minimumPhpVersion }}"
-
-        - name: "Validate Composer version"
-          shell: "bash"
-          run: "${GITHUB_ACTION_PATH}/bin/composer_version_check.sh ${{ github.event.client_payload.requirements.minimumComposerVersion }}"
+          shell: bash
+          run: |
+            if [[ "${BRANCH}" == "conductor-nothing" ]]; then
+              echo "COMPOSER_NO_SECURITY_BLOCKING=1" >> "$GITHUB_ENV"
+            else
+              echo "COMPOSER_NO_SECURITY_BLOCKING=0" >> "$GITHUB_ENV"
+            fi
+          env:
+            BRANCH: ${{ github.event.client_payload.branch }}
 
         - name: Store base commit info
+          shell: bash
           id: base_commit_info
           run: |
             git log -1 --format="HASH=%H" >> $GITHUB_OUTPUT
             git log -1 --format="AUTHOR=%an" >> $GITHUB_OUTPUT
             git log -1 --format="MESSAGE=%s" >> $GITHUB_OUTPUT
-          shell: bash
-
-        - name: Configure Composer authentication
-          shell: "bash"
-          if: ${{ github.event.client_payload.composerAuthentication.type == 'environment' }}
-          run: echo 'COMPOSER_AUTH=${{ github.event.client_payload.composerAuthentication.environment }}' >> "$GITHUB_ENV"
 
         - name: Install dependencies
           uses: ramsey/composer-install@a35c6ebd3d08125aaf8852dff361e686a1a67947 # 3.2.0
+          env:
+            COMPOSER_AUTH: ${{ github.event.client_payload.composerAuthentication.type == 'environment' && github.event.client_payload.composerAuthentication.environment || env.COMPOSER_AUTH }}
           with:
               working-directory: "${{ github.event.client_payload.workingDirectory }}"
               composer-options: "${{ github.event.client_payload.settings.debug == true && '-vvv' || '' }}"
 
         - name: Modify requirements in the composer.json
-          run: "${{ github.event.client_payload.settings.debug == true && github.event.client_payload.requireCommand.debug || github.event.client_payload.requireCommand.plain }}"
           if: ${{ github.event.client_payload.requireCommand }}
           shell: bash
+          run: '"${GITHUB_ACTION_PATH}/bin/run_composer_command.sh" require'
           working-directory: "${{ github.event.client_payload.workingDirectory }}"
+          env:
+            COMPOSER_COMMAND_STRING: ${{ github.event.client_payload.settings.debug == true && github.event.client_payload.requireCommand.debug || github.event.client_payload.requireCommand.plain }}
+            COMPOSER_AUTH: ${{ github.event.client_payload.composerAuthentication.type == 'environment' && github.event.client_payload.composerAuthentication.environment || env.COMPOSER_AUTH }}
 
         - name: Composer update
-          run: "${{ github.event.client_payload.settings.debug == true && github.event.client_payload.updateCommand.debug || github.event.client_payload.updateCommand.plain }}"
           shell: bash
+          run: '"${GITHUB_ACTION_PATH}/bin/run_composer_command.sh" update'
           working-directory: "${{ github.event.client_payload.workingDirectory }}"
+          env:
+            COMPOSER_COMMAND_STRING: ${{ github.event.client_payload.settings.debug == true && github.event.client_payload.updateCommand.debug || github.event.client_payload.updateCommand.plain }}
+            COMPOSER_AUTH: ${{ github.event.client_payload.composerAuthentication.type == 'environment' && github.event.client_payload.composerAuthentication.environment || env.COMPOSER_AUTH }}
 
         - name: Uninstall git hooks
+          shell: bash
           if: ${{ inputs.skip_git_hooks != 'false' }}
           run: "rm -rf .git/hooks"
-          shell: "bash"
 
         - name: Create branch
-          run: git checkout -b $BRANCH
           shell: bash
+          run: git checkout -b $BRANCH
           env:
               BRANCH: ${{ github.event.client_payload.branch }}
 
         - name: Add files
+          shell: bash
           run: |
               read -r -a PATTERN_EXPANDED <<< "$FILE_PATTERN";
               git add ${FILE_PATTERN:+"${PATTERN_EXPANDED[@]}"};
-          shell: bash
           env:
               FILE_PATTERN: ${{ inputs.file_pattern }}
 
@@ -100,37 +137,29 @@ runs:
               skip-empty: true
 
         - name: Store number of changed files
+          shell: bash
           id: number_of_changed_files
           run: echo "COUNT=$(git --no-pager diff --name-only $GITHUB_SHA | wc -l | tr -d ' ')" >> $GITHUB_OUTPUT
-          shell: bash
 
         - name: Store Conductor commit info
+          shell: bash
           id: conductor_commit_info
           run: |
             git log -1 --format="HASH=%H" >> $GITHUB_OUTPUT
             git log -1 --format="AUTHOR=%an" >> $GITHUB_OUTPUT
             git log -1 --format="MESSAGE=%s" >> $GITHUB_OUTPUT
-          shell: bash
 
         - name: Push branch
-          run: git push origin $BRANCH --force
           shell: bash
+          run: git push origin $BRANCH --force
           if: ${{ steps.number_of_changed_files.outputs.COUNT != 0 }}
           env:
               BRANCH: ${{ github.event.client_payload.branch }}
 
         - name: Call webhook from Private Packagist to create the pull request
           shell: bash
-          env:
-            RUN_ID: ${{ github.run_id }};
-            CHANGED_FILES: ${{ steps.number_of_changed_files.outputs.COUNT }}
-            BASE_COMMIT_HASH: ${{ steps.base_commit_info.outputs.HASH }}
-            BASE_COMMIT_AUTHOR: ${{ steps.base_commit_info.outputs.AUTHOR }}
-            BASE_COMMIT_MESSAGE: ${{ steps.base_commit_info.outputs.MESSAGE }}
-            CONDUCTOR_COMMIT_HASH: ${{ steps.conductor_commit_info.outputs.HASH }}
-            CONDUCTOR_COMMIT_AUTHOR: ${{ steps.conductor_commit_info.outputs.AUTHOR }}
-            CONDUCTOR_COMMIT_MESSAGE: ${{ steps.conductor_commit_info.outputs.MESSAGE }}
           run: |
+            "${GITHUB_ACTION_PATH}/bin/webhook_url_check.sh" "${PACKAGIST_URL}" "${WEBHOOK_EXECUTEDURL}"
             jq -n '{
               "runId": env.RUN_ID,
               "numberOfChangedFiles": env.CHANGED_FILES,
@@ -150,20 +179,29 @@ runs:
                 "ciScriptVersion": env.CONDUCTOR_ACTION_VERSION
               }
             }' | curl -fsSL -X POST \
-              -u "${{ github.event.client_payload.webhook.authentication.username }}:${{ github.event.client_payload.webhook.authentication.password }}" \
+              -u "${WEBHOOK_AUTHENTICATION_USERNAME}:${WEBHOOK_AUTHENTICATION_PASSWORD}" \
               --header "Content-Type: application/json" \
               --data @- \
-              "${{ github.event.client_payload.webhook.executedUrl }}"
-
-        - name: Call webhook from Private Packagist to notify about build failure
-          shell: bash
+              "${WEBHOOK_EXECUTEDURL}"
           env:
             RUN_ID: ${{ github.run_id }}
+            CHANGED_FILES: ${{ steps.number_of_changed_files.outputs.COUNT }}
             BASE_COMMIT_HASH: ${{ steps.base_commit_info.outputs.HASH }}
             BASE_COMMIT_AUTHOR: ${{ steps.base_commit_info.outputs.AUTHOR }}
             BASE_COMMIT_MESSAGE: ${{ steps.base_commit_info.outputs.MESSAGE }}
+            CONDUCTOR_COMMIT_HASH: ${{ steps.conductor_commit_info.outputs.HASH }}
+            CONDUCTOR_COMMIT_AUTHOR: ${{ steps.conductor_commit_info.outputs.AUTHOR }}
+            CONDUCTOR_COMMIT_MESSAGE: ${{ steps.conductor_commit_info.outputs.MESSAGE }}
+            WEBHOOK_AUTHENTICATION_USERNAME: ${{ github.event.client_payload.webhook.authentication.username }}
+            WEBHOOK_AUTHENTICATION_PASSWORD: ${{ github.event.client_payload.webhook.authentication.password }}
+            WEBHOOK_EXECUTEDURL: ${{ github.event.client_payload.webhook.executedUrl }}
+            PACKAGIST_URL: ${{ inputs.packagist_url }}
+
+        - name: Call webhook from Private Packagist to notify about build failure
+          shell: bash
           if: ${{ failure() }}
           run: |
+            "${GITHUB_ACTION_PATH}/bin/webhook_url_check.sh" "${PACKAGIST_URL}" "${WEBHOOK_ERRORURL}"
             jq -n '{
               "runId": env.RUN_ID,
               "gitInfo": {
@@ -177,7 +215,16 @@ runs:
                 "ciScriptVersion": env.CONDUCTOR_ACTION_VERSION
               }
             }' | curl -fsSL -X POST \
-              -u "${{ github.event.client_payload.webhook.authentication.username }}:${{ github.event.client_payload.webhook.authentication.password }}" \
+              -u "${WEBHOOK_AUTHENTICATION_USERNAME}:${WEBHOOK_AUTHENTICATION_PASSWORD}" \
               --header "Content-Type: application/json" \
               --data @- \
-              "${{ github.event.client_payload.webhook.errorUrl }}"
+              "${WEBHOOK_ERRORURL}"
+          env:
+            RUN_ID: ${{ github.run_id }}
+            BASE_COMMIT_HASH: ${{ steps.base_commit_info.outputs.HASH }}
+            BASE_COMMIT_AUTHOR: ${{ steps.base_commit_info.outputs.AUTHOR }}
+            BASE_COMMIT_MESSAGE: ${{ steps.base_commit_info.outputs.MESSAGE }}
+            WEBHOOK_AUTHENTICATION_USERNAME: ${{ github.event.client_payload.webhook.authentication.username }}
+            WEBHOOK_AUTHENTICATION_PASSWORD: ${{ github.event.client_payload.webhook.authentication.password }}
+            WEBHOOK_ERRORURL: ${{ github.event.client_payload.webhook.errorUrl }}
+            PACKAGIST_URL: ${{ inputs.packagist_url }}
