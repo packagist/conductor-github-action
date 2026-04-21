@@ -81,6 +81,21 @@ For example:
     skip_git_hooks: "true"
 ```
 
+#### packagist_url
+
+The `packagist_url` input parameter sets the base URL of the Private Packagist instance that dispatches this action.
+Webhook callbacks in the dispatched payload must point at a URL under this prefix; any other host is refused before
+the action makes the HTTP request, preventing a hostile payload from redirecting the webhook (and its credentials)
+to an attacker-controlled server.
+
+The default is `https://packagist.com`. Override it only when running a Private Packagist Self-Hosted installation:
+
+```yaml
+- uses: packagist/conductor-github-action
+  with:
+      packagist_url: "https://packagist.example.com"
+```
+
 ## Copyright and License
 
 The  GitHub Action is licensed under the MIT License.

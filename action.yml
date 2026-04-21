@@ -12,6 +12,10 @@ inputs:
         description: Skip any git hooks that get installed as part of the GitHub Action e.g. during composer install or update.
         default: 'false'
         required: false
+    packagist_url:
+        description: Base URL of the Private Packagist instance that dispatches this action. Webhook URLs in the payload must be under this prefix; requests to any other host are refused. Override this for self-hosted installations.
+        default: 'https://packagist.com'
+        required: false
 
 runs:
     using: "composite"
@@ -78,15 +82,19 @@ runs:
               composer-options: "${{ github.event.client_payload.settings.debug == true && '-vvv' || '' }}"
 
         - name: Modify requirements in the composer.json
-          run: "${{ github.event.client_payload.settings.debug == true && github.event.client_payload.requireCommand.debug || github.event.client_payload.requireCommand.plain }}"
           if: ${{ github.event.client_payload.requireCommand }}
           shell: bash
           working-directory: "${{ github.event.client_payload.workingDirectory }}"
+          env:
+            COMPOSER_COMMAND_STRING: ${{ github.event.client_payload.settings.debug == true && github.event.client_payload.requireCommand.debug || github.event.client_payload.requireCommand.plain }}
+          run: '"${GITHUB_ACTION_PATH}/bin/run_composer_command.sh" require'
 
         - name: Composer update
-          run: "${{ github.event.client_payload.settings.debug == true && github.event.client_payload.updateCommand.debug || github.event.client_payload.updateCommand.plain }}"
           shell: bash
           working-directory: "${{ github.event.client_payload.workingDirectory }}"
+          env:
+            COMPOSER_COMMAND_STRING: ${{ github.event.client_payload.settings.debug == true && github.event.client_payload.updateCommand.debug || github.event.client_payload.updateCommand.plain }}
+          run: '"${GITHUB_ACTION_PATH}/bin/run_composer_command.sh" update'
 
         - name: Uninstall git hooks
           if: ${{ inputs.skip_git_hooks != 'false' }}
@@ -147,7 +155,9 @@ runs:
             GITHUB_EVENT_CLIENT_PAYLOAD_WEBHOOK_AUTHENTICATION_USERNAME: ${{ github.event.client_payload.webhook.authentication.username }}
             GITHUB_EVENT_CLIENT_PAYLOAD_WEBHOOK_AUTHENTICATION_PASSWORD: ${{ github.event.client_payload.webhook.authentication.password }}
             GITHUB_EVENT_CLIENT_PAYLOAD_WEBHOOK_EXECUTEDURL: ${{ github.event.client_payload.webhook.executedUrl }}
+            PACKAGIST_URL: ${{ inputs.packagist_url }}
           run: |
+            "${GITHUB_ACTION_PATH}/bin/validate_webhook_url.sh" "${PACKAGIST_URL}" "${GITHUB_EVENT_CLIENT_PAYLOAD_WEBHOOK_EXECUTEDURL}"
             jq -n '{
               "runId": env.RUN_ID,
               "numberOfChangedFiles": env.CHANGED_FILES,
@@ -182,8 +192,10 @@ runs:
             GITHUB_EVENT_CLIENT_PAYLOAD_WEBHOOK_AUTHENTICATION_USERNAME: ${{ github.event.client_payload.webhook.authentication.username }}
             GITHUB_EVENT_CLIENT_PAYLOAD_WEBHOOK_AUTHENTICATION_PASSWORD: ${{ github.event.client_payload.webhook.authentication.password }}
             GITHUB_EVENT_CLIENT_PAYLOAD_WEBHOOK_ERRORURL: ${{ github.event.client_payload.webhook.errorUrl }}
+            PACKAGIST_URL: ${{ inputs.packagist_url }}
           if: ${{ failure() }}
           run: |
+            "${GITHUB_ACTION_PATH}/bin/validate_webhook_url.sh" "${PACKAGIST_URL}" "${GITHUB_EVENT_CLIENT_PAYLOAD_WEBHOOK_ERRORURL}"
             jq -n '{
               "runId": env.RUN_ID,
               "gitInfo": {
