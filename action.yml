@@ -82,15 +82,10 @@ runs:
             git log -1 --format="MESSAGE=%s" >> $GITHUB_OUTPUT
           shell: bash
 
-        - name: Configure Composer authentication
-          shell: "bash"
-          if: ${{ github.event.client_payload.composerAuthentication.type == 'environment' }}
-          run: echo 'COMPOSER_AUTH=${GITHUB_EVENT_CLIENT_PAYLOAD_COMPOSERAUTHENTICATION_ENVIRONMENT}' >> "$GITHUB_ENV"
-          env:
-            GITHUB_EVENT_CLIENT_PAYLOAD_COMPOSERAUTHENTICATION_ENVIRONMENT: ${{ github.event.client_payload.composerAuthentication.environment }}
-
         - name: Install dependencies
           uses: ramsey/composer-install@a35c6ebd3d08125aaf8852dff361e686a1a67947 # 3.2.0
+          env:
+            COMPOSER_AUTH: ${{ github.event.client_payload.composerAuthentication.type == 'environment' && github.event.client_payload.composerAuthentication.environment || env.COMPOSER_AUTH }}
           with:
               working-directory: "${{ github.event.client_payload.workingDirectory }}"
               composer-options: "${{ github.event.client_payload.settings.debug == true && '-vvv' || '' }}"
@@ -101,6 +96,7 @@ runs:
           working-directory: "${{ github.event.client_payload.workingDirectory }}"
           env:
             COMPOSER_COMMAND_STRING: ${{ github.event.client_payload.settings.debug == true && github.event.client_payload.requireCommand.debug || github.event.client_payload.requireCommand.plain }}
+            COMPOSER_AUTH: ${{ github.event.client_payload.composerAuthentication.type == 'environment' && github.event.client_payload.composerAuthentication.environment || env.COMPOSER_AUTH }}
           run: '"${GITHUB_ACTION_PATH}/bin/run_composer_command.sh" require'
 
         - name: Composer update
@@ -108,6 +104,7 @@ runs:
           working-directory: "${{ github.event.client_payload.workingDirectory }}"
           env:
             COMPOSER_COMMAND_STRING: ${{ github.event.client_payload.settings.debug == true && github.event.client_payload.updateCommand.debug || github.event.client_payload.updateCommand.plain }}
+            COMPOSER_AUTH: ${{ github.event.client_payload.composerAuthentication.type == 'environment' && github.event.client_payload.composerAuthentication.environment || env.COMPOSER_AUTH }}
           run: '"${GITHUB_ACTION_PATH}/bin/run_composer_command.sh" update'
 
         - name: Uninstall git hooks
