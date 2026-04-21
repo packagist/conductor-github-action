@@ -20,17 +20,6 @@ inputs:
 runs:
     using: "composite"
     steps:
-        # Temporary workaround to make sure you can set up Conductor for
-        # the first time. The CI verification job runs "composer update nothing"
-        # which fails if your composer.lock contains any versions with
-        # known security issues in Composer >=2.9.0
-        - name: Set security blocking environment variable
-          shell: "bash"
-          run: echo "COMPOSER_NO_SECURITY_BLOCKING=${{ github.event.client_payload.branch == 'conductor-nothing' && 1 || 0 }}" >> $GITHUB_ENV
-        - name: Set Conductor version
-          shell: "bash"
-          run: echo "CONDUCTOR_ACTION_VERSION=1.5.3" >> $GITHUB_ENV
-
         - run: |
             CONDUCTOR_TOKEN=$(jq -r '.client_payload.composerAuthentication.token' $GITHUB_EVENT_PATH)
             echo "::add-mask::$CONDUCTOR_TOKEN"
@@ -41,6 +30,16 @@ runs:
             WEBHOOK_AUTHENTICATION_PASSWORD=$(jq -r '.client_payload.webhook.authentication.password' $GITHUB_EVENT_PATH)
             echo "::add-mask::$WEBHOOK_AUTHENTICATION_PASSWORD"
           shell: "bash"
+
+        - name: Set Conductor version
+          shell: "bash"
+          run: echo "CONDUCTOR_ACTION_VERSION=1.5.3" >> $GITHUB_ENV
+
+        - name: Validate Conductor branch name
+          shell: "bash"
+          env:
+            BRANCH: ${{ github.event.client_payload.branch }}
+          run: '"${GITHUB_ACTION_PATH}/bin/validate_branch_name.sh" "${BRANCH}"'
 
         - name: "Validate GitHub action version"
           shell: "bash"
@@ -59,6 +58,21 @@ runs:
           run: "${GITHUB_ACTION_PATH}/bin/composer_version_check.sh ${GITHUB_EVENT_CLIENT_PAYLOAD_REQUIREMENTS_MINIMUMCOMPOSERVERSION}"
           env:
             GITHUB_EVENT_CLIENT_PAYLOAD_REQUIREMENTS_MINIMUMCOMPOSERVERSION: ${{ github.event.client_payload.requirements.minimumComposerVersion }}
+
+      # Temporary workaround to make sure you can set up Conductor for
+      # the first time. The CI verification job runs "composer update nothing"
+      # which fails if your composer.lock contains any versions with
+      # known security issues in Composer >=2.9.0
+        - name: Set security blocking environment variable
+          shell: "bash"
+          env:
+            BRANCH: ${{ github.event.client_payload.branch }}
+          run: |
+            if [[ "${BRANCH}" == "conductor-nothing" ]]; then
+              echo "COMPOSER_NO_SECURITY_BLOCKING=1" >> "$GITHUB_ENV"
+            else
+              echo "COMPOSER_NO_SECURITY_BLOCKING=0" >> "$GITHUB_ENV"
+            fi
 
         - name: Store base commit info
           id: base_commit_info
