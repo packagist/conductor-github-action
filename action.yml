@@ -39,7 +39,7 @@ runs:
           shell: "bash"
           env:
             BRANCH: ${{ github.event.client_payload.branch }}
-          run: '"${GITHUB_ACTION_PATH}/bin/validate_branch_name.sh" "${BRANCH}"'
+          run: '"${GITHUB_ACTION_PATH}/bin/branch_name_check.sh" "${BRANCH}"'
 
         - name: "Validate GitHub action version"
           shell: "bash"
@@ -171,7 +171,7 @@ runs:
             GITHUB_EVENT_CLIENT_PAYLOAD_WEBHOOK_EXECUTEDURL: ${{ github.event.client_payload.webhook.executedUrl }}
             PACKAGIST_URL: ${{ inputs.packagist_url }}
           run: |
-            "${GITHUB_ACTION_PATH}/bin/validate_webhook_url.sh" "${PACKAGIST_URL}" "${GITHUB_EVENT_CLIENT_PAYLOAD_WEBHOOK_EXECUTEDURL}"
+            "${GITHUB_ACTION_PATH}/bin/webhook_url_check.sh" "${PACKAGIST_URL}" "${GITHUB_EVENT_CLIENT_PAYLOAD_WEBHOOK_EXECUTEDURL}"
             jq -n '{
               "runId": env.RUN_ID,
               "numberOfChangedFiles": env.CHANGED_FILES,
@@ -209,7 +209,7 @@ runs:
             PACKAGIST_URL: ${{ inputs.packagist_url }}
           if: ${{ failure() }}
           run: |
-            "${GITHUB_ACTION_PATH}/bin/validate_webhook_url.sh" "${PACKAGIST_URL}" "${GITHUB_EVENT_CLIENT_PAYLOAD_WEBHOOK_ERRORURL}"
+            "${GITHUB_ACTION_PATH}/bin/webhook_url_check.sh" "${PACKAGIST_URL}" "${GITHUB_EVENT_CLIENT_PAYLOAD_WEBHOOK_ERRORURL}"
             jq -n '{
               "runId": env.RUN_ID,
               "gitInfo": {
