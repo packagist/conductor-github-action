@@ -37,7 +37,7 @@ runs:
         # This is the version that needs to be increased for each release of the GitHub Action
         - name: Set Conductor version
           shell: bash
-          run: echo "CONDUCTOR_ACTION_VERSION=1.5.3" >> $GITHUB_ENV
+          run: echo "CONDUCTOR_ACTION_VERSION=1.6.0" >> $GITHUB_ENV
 
         - name: Validate Conductor branch name
           shell: bash
