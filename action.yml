@@ -20,17 +20,21 @@ inputs:
 runs:
     using: "composite"
     steps:
-        - run: |
+        # Set local environment variables using jq instead of passing the values via env: to not leak secrets before maksing them
+        - name: Mask Composer authentication token
+          shell: "bash"
+          run: |
             CONDUCTOR_TOKEN=$(jq -r '.client_payload.composerAuthentication.token' $GITHUB_EVENT_PATH)
             echo "::add-mask::$CONDUCTOR_TOKEN"
           if: ${{ github.event.client_payload.composerAuthentication.type != 'none' }}
-          shell: "bash"
 
-        - run: |
+        - name: Mask webhook authentication token
+          shell: "bash"
+          run: |
             WEBHOOK_AUTHENTICATION_PASSWORD=$(jq -r '.client_payload.webhook.authentication.password' $GITHUB_EVENT_PATH)
             echo "::add-mask::$WEBHOOK_AUTHENTICATION_PASSWORD"
-          shell: "bash"
 
+        # This is the version that needs to be increased for each release of the GitHub Action
         - name: Set Conductor version
           shell: "bash"
           run: echo "CONDUCTOR_ACTION_VERSION=1.5.3" >> $GITHUB_ENV
@@ -59,10 +63,10 @@ runs:
           env:
             GITHUB_EVENT_CLIENT_PAYLOAD_REQUIREMENTS_MINIMUMCOMPOSERVERSION: ${{ github.event.client_payload.requirements.minimumComposerVersion }}
 
-      # Temporary workaround to make sure you can set up Conductor for
-      # the first time. The CI verification job runs "composer update nothing"
-      # which fails if your composer.lock contains any versions with
-      # known security issues in Composer >=2.9.0
+        # Temporary workaround to make sure you can set up Conductor for
+        # the first time. The CI verification job runs "composer update nothing"
+        # which fails if your composer.lock contains any versions with
+        # known security issues in Composer >=2.9.0
         - name: Set security blocking environment variable
           shell: "bash"
           env:
