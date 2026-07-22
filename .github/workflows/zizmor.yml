@@ -31,5 +31,4 @@ jobs:
         with:
           advanced-security: false
           annotations: true
-          online-audits: false
           persona: 'pedantic'
