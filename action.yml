@@ -131,7 +131,7 @@ runs:
               FILE_PATTERN: ${{ inputs.file_pattern }}
 
         - name: Commit
-          uses: qoomon/actions--create-commit@dfef4d264de752be6d6195a4d61a2f3d3262d406 # v1.2.3
+          uses: qoomon/actions--create-commit@7102b1a8b3cb8716dc70dbeb6d774c375d779d2f # v1.2.5
           with:
               message: ${{ github.event.client_payload.commitMessage }}
               skip-empty: true
